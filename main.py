@@ -8,19 +8,19 @@
 import argparse
 from utils.resultTable import ResultTable
 import json
-"""
-...主逻辑处理入口
-"""
+import pandas as pd
+import copy
+Land_acquisition_area = ["水库淹没影响区", "枢纽工程建设区"]
 
 
-def main():
-    parser = argparse.ArgumentParser(description='输出参数列表')
-    parser.add_argument('-dataTablePath', default='./data/data.xlsx',type=str, help='基础数据表输入路径... '
-                                                                        'for example:-dataTablePath test.xlsx')
-    parser.add_argument('-outputPath', default='./test.xlsx', type=str, help='数据输出路径')
-    args = parser.parse_args()
+def generate_result_table(output_path):
+    """
+    :生成目标表结构
+    :param output_path: 输出路径
+    :return: 目标表
+    """
     # 创建结果表
-    result = ResultTable(args.outputPath)
+    result = ResultTable(output_path)
     # 格式化输出
     # 设置表头, 对于当前表而言有30列
     result.setTableHead('XXX水库建设征地移民安置补偿投资估算表(征收土地补偿费和安置补偿费及征用土地补偿费)', 1, 1, 1, 30)
@@ -36,7 +36,7 @@ def main():
     result.setData(4, 6, '小计')
     result.setData(4, 7, '淹没区')
     result.setData(4, 8, '浸没区')
-    result.setData(4, 9, '坍岸区')
+    result.setData(4, 9, '塌岸区')
     result.setData(4, 10, '滑坡区')
     result.setData(4, 11, '内涝区')
     result.setData(4, 12, '水库渗透区')
@@ -51,7 +51,7 @@ def main():
     result.setData(4, 19, '小计')
     result.setData(4, 20, '淹没区')
     result.setData(4, 21, '浸没区')
-    result.setData(4, 22, '坍岸区')
+    result.setData(4, 22, '塌岸区')
     result.setData(4, 23, '滑坡区')
     result.setData(4, 24, '内涝区')
     result.setData(4, 25, '水库渗透区')
@@ -61,17 +61,111 @@ def main():
     result.setData(4, 28, '库区提前征用')
     result.setData(4, 29, '永久')
     result.setData(4, 30, '临时')
+    # 生成数据表区域
+    start_row = 5
+    end_row = 173
+    start_col = 1
+    end_col = 31
+    for row in range(start_row, end_row):
+        for col in range(start_col, end_col):
+            # 占位
+            result.setData(row, col, '')
     # 根据json配置行
     with open('./config/LandUseType.json', 'r', encoding='utf8')as jsonfile:
         json_data = json.load(jsonfile)
     start = 5
-    for i in range(len(json_data)):
-        key = json_data
-        result.setData(5, 1, )
+    for i, key in enumerate(json_data):
+        data = json_data[key]
+        result.setData(start, 2, key)
         start += 1
-        for j in range(len(json_data[i])):
-            result.setData()
-            start += 1
+        if type(data) == list:
+            for j in range(len(data)):
+                subdata = data[j]
+                if type(subdata) == dict:
+                    for z, subkey in enumerate(subdata):
+                        landuse_data = subdata[subkey]
+                        for k in range(len(landuse_data)):
+                            landuse_group = landuse_data[k]
+                            for landuse_group_key in landuse_group.keys():
+                                result.setData(start, 1, landuse_group_key)
+                                landuse_types = landuse_group[landuse_group_key]
+                                for landuse_type in landuse_types:
+                                    result.setData(start, 2, landuse_type)
+                                    start += 1
+
+    return result
+
+
+def get_landuse_price(input_path):
+    """
+    读取单价表
+    :param input_path:输入路径
+    :return:单价字典
+    """
+    with open(input_path, 'r', encoding='utf8')as jsonfile:
+        json_data = json.load(jsonfile)
+    return json_data
+
+
+def get_data_statics(df):
+    """
+    0:OBJECTID *
+    1:省
+    2:市
+    3:区
+    4:街道办
+    5:社区
+    6:征地区域
+    7:用地性质
+    8:功能区1
+    9:功能区2
+    10:区类
+    11:三大类
+    12:一级类
+    13:二级类
+    14:面积_亩
+    15:地类备注1
+    16:地类备注2
+    17:地类备注3
+    18:边长
+    19:面积
+    """
+    with open("./config/LandUseArea.json", 'r', encoding='utf8')as json_file:
+        land_use_area_statics = json.load(json_file)
+    statics = {}
+    for i in range(len(Land_acquisition_area)):
+        statics[Land_acquisition_area[i]] = copy.deepcopy(land_use_area_statics)
+    # 获取当前表的数据行列
+    rows = df.shape[0]
+    for row in range(rows):
+        row_data = df.loc[row].values
+        # 征地区域
+        if row_data[6] in Land_acquisition_area:
+            try:
+                # 用地类型, 只在json指明的地类中进行统计
+                statics[row_data[6]][row_data[12]][row_data[13]] += row_data[19]
+            except:
+                pass
+    return statics
+
+
+def main():
+    """
+    ...主逻辑处理入口
+    """
+    parser = argparse.ArgumentParser(description='输出参数列表')
+    parser.add_argument('-dataTablePath', default='./data/data.xlsx',type=str, help='基础数据表输入路径... '
+                                                                        'for example:-dataTablePath test.xlsx')
+    parser.add_argument('-outputPath', default='./test.xlsx', type=str, help='数据输出路径')
+    args = parser.parse_args()
+    result = generate_result_table(args.outputPath)
+    land_use_price = get_landuse_price("./config/LandUnitPrice.json")
+    # 读取基础数据
+    # 一行数据的结构如下
+    df = pd.read_excel("./data/data.xlsx")
+    # 统计数据
+    statics = get_data_statics(df)
+    # 填充数据到结果表
     result.save()
 
 
