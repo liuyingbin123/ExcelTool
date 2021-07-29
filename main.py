@@ -170,6 +170,7 @@ def get_data_statics(df):
 def fill_data(statics, table, price):
     # 填充统计字典的每一列, 从第6行第7列开始
     start_col = 7
+    start_col2 = 20
     for i, key in enumerate(statics):
         first = statics[key]
         for j, key2 in enumerate(first):
@@ -178,13 +179,24 @@ def fill_data(statics, table, price):
             for z, key3 in enumerate(second):
                 thrid = second[key3]
                 for y, key4 in enumerate(thrid):
-                    table.setData(start_row,start_col,thrid[key4])
+                    table.setData(start_row, start_col, thrid[key4])
+                    try:
+                        cost = thrid[key4] * price['征收土地补偿费和安置补偿费'][key4] / 10000.0
+                        table.setData(start_row, start_col2, cost)
+                        # 单价
+                        table.setData(start_row, 4, price['征收土地补偿费和安置补偿费'][key4] / 10000.0)
+                        table.setData(start_row, 3, '亩')
+                    except:
+                        pass
                     start_row += 1
                 start_row += 1
             start_col += 1
+            start_col2 += 1
         start_col += 1
+        start_col2 += 1
     second_row = start_row + 1
     start_col = 7
+    start_col2 = 20
     for i, key in enumerate(statics):
         first = statics[key]
         for j, key2 in enumerate(first):
@@ -193,11 +205,21 @@ def fill_data(statics, table, price):
             for z, key3 in enumerate(second):
                 thrid = second[key3]
                 for y, key4 in enumerate(thrid):
-                    table.setData(start_row,start_col,thrid[key4])
+                    table.setData(start_row, start_col, thrid[key4])
+                    try:
+                        cost = thrid[key4] * price['征用土地补偿费'][key4] / 10000.0
+                        table.setData(start_row, start_col2, cost)
+                        table.setData(start_row, 4, price['征用土地补偿费'][key4]/10000.0)
+                        table.setData(start_row, 3, '亩')
+                    except:
+                        pass
                     start_row += 1
                 start_row += 1
             start_col += 1
+            start_col2 += 1
         start_col += 1
+        start_col2 += 1
+
 
 
 
@@ -221,6 +243,45 @@ def main():
         land_use_price = json.load(json_file)
     # 填充数据到结果表
     fill_data(statics, result, land_use_price)
+    # 小计和合计
+    start_row = 6
+    end_row = 172
+    for i in range(start_row, end_row+1):
+        # 小计
+        split_sum1 = 0
+        split_sum2 = 0
+        split_sum3 = 0
+        split_sum4 = 0
+        for j in range(7, 14):
+            try:
+                split_sum1 += float(result.ws.cell(i, j).value)
+            except:
+                continue
+        for j in range(16, 18):
+            try:
+                split_sum2 += float(result.ws.cell(i, j).value)
+            except:
+                continue
+        for j in range(20, 27):
+            try:
+                split_sum3 += float(result.ws.cell(i, j).value)
+            except:
+                continue
+        for j in range(28, 31):
+            try:
+                split_sum4 += float(result.ws.cell(i, j).value)
+            except:
+                continue
+        # 小计
+        result.setData(i, 6, split_sum1)
+        result.setData(i, 14, split_sum2)
+        result.setData(i, 19, split_sum3)
+        result.setData(i, 27, split_sum4)
+        # 合计
+        total_num1 = split_sum1 + split_sum2
+        total_num2 = split_sum3 + split_sum4
+        result.setData(i, 5, total_num1)
+        result.setData(i, 18, total_num2)
     result.save()
 
 
