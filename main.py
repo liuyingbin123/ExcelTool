@@ -10,7 +10,9 @@ from utils.resultTable import ResultTable
 import json
 import pandas as pd
 import copy
-Land_acquisition_area = ["水库淹没影响区", "枢纽工程建设区"]
+STATICS_LAND_ACQUISITION_AREA = ["水库淹没影响区", "枢纽工程建设区"]
+STATICS_FUNCTIONAL_AREA1 = ["淹没区","浸没区","塌岸区","滑坡区","内涝区","水库渗透区", "其他"]
+STATICS_FUNCTIONAL_AREA2 = ["库区提前征用","永久","临时"]
 
 
 def generate_result_table(output_path):
@@ -132,21 +134,71 @@ def get_data_statics(df):
     """
     with open("./config/LandUseArea.json", 'r', encoding='utf8')as json_file:
         land_use_area_statics = json.load(json_file)
+    temps1 = {}
+    temps2 = {}
     statics = {}
-    for i in range(len(Land_acquisition_area)):
-        statics[Land_acquisition_area[i]] = copy.deepcopy(land_use_area_statics)
+    for i in range(len(STATICS_FUNCTIONAL_AREA1)):
+        temps1[STATICS_FUNCTIONAL_AREA1[i]] = copy.deepcopy(land_use_area_statics)
+    for i in range(len(STATICS_FUNCTIONAL_AREA2)):
+        temps2[STATICS_FUNCTIONAL_AREA2[i]] = copy.deepcopy(land_use_area_statics)
+    statics["水库淹没影响区"] = temps1
+    statics["枢纽工程建设区"] = temps2
     # 获取当前表的数据行列
     rows = df.shape[0]
     for row in range(rows):
         row_data = df.loc[row].values
         # 征地区域
-        if row_data[6] in Land_acquisition_area:
+        if row_data[6] in STATICS_LAND_ACQUISITION_AREA and row_data[6]=="水库淹没影响区":
             try:
                 # 用地类型, 只在json指明的地类中进行统计
-                statics[row_data[6]][row_data[12]][row_data[13]] += row_data[19]
+                if row_data[8] in STATICS_FUNCTIONAL_AREA1:
+                    statics[row_data[6]][row_data[8]][row_data[12]][row_data[13]] += row_data[19]
+                else:
+                    statics[row_data[6]]["其他"][row_data[12]][row_data[13]] += row_data[19]
+            except:
+                pass
+        elif row_data[6] in STATICS_LAND_ACQUISITION_AREA and row_data[6]=="枢纽工程建设区":
+            try:
+                # 用地类型, 只在json指明的地类中进行统计
+                if row_data[7] in STATICS_FUNCTIONAL_AREA2:
+                    statics[row_data[6]][row_data[7]][row_data[12]][row_data[13]] += row_data[19]
             except:
                 pass
     return statics
+
+
+def fill_data(statics, table, price):
+    # 填充统计字典的每一列, 从第6行第7列开始
+    start_col = 7
+    for i, key in enumerate(statics):
+        first = statics[key]
+        for j, key2 in enumerate(first):
+            start_row = 7
+            second = first[key2]
+            for z, key3 in enumerate(second):
+                thrid = second[key3]
+                for y, key4 in enumerate(thrid):
+                    table.setData(start_row,start_col,thrid[key4])
+                    start_row += 1
+                start_row += 1
+            start_col += 1
+        start_col += 1
+    second_row = start_row + 1
+    start_col = 7
+    for i, key in enumerate(statics):
+        first = statics[key]
+        for j, key2 in enumerate(first):
+            start_row = second_row
+            second = first[key2]
+            for z, key3 in enumerate(second):
+                thrid = second[key3]
+                for y, key4 in enumerate(thrid):
+                    table.setData(start_row,start_col,thrid[key4])
+                    start_row += 1
+                start_row += 1
+            start_col += 1
+        start_col += 1
+
 
 
 def main():
@@ -165,7 +217,10 @@ def main():
     df = pd.read_excel("./data/data.xlsx")
     # 统计数据
     statics = get_data_statics(df)
+    with open("./config/LandUnitPrice.json", 'r', encoding='utf8')as json_file:
+        land_use_price = json.load(json_file)
     # 填充数据到结果表
+    fill_data(statics, result, land_use_price)
     result.save()
 
 
